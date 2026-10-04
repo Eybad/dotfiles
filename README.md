@@ -12,7 +12,7 @@ replica rutas relativas a `$HOME` y stow las enlaza con symlinks.
 
 ```sh
 pkg install git stow
-git clone https://github.com/<usuario>/dotfiles.git ~/dotfiles
+git clone https://github.com/Eybad/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 stow --no-folding zsh git termux nvim starship gh bin
 ```

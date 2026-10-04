@@ -1,0 +1,48 @@
+# ~/.config/starship.toml
+"$schema" = 'https://starship.rs/config-schema.json'
+
+add_newline = true
+command_timeout = 500
+
+format = """$directory$git_branch$git_status$fill $memory_usage${custom.diskspace}
+$character"""
+
+# Línea divisora entre bloque izquierdo y derecho
+[fill]
+symbol = "─"
+style = "dimmed #6c7086"
+
+[directory]
+style = "bold #89b4fa"
+truncation_length = 0        # 0 = sin truncar, ruta completa
+truncate_to_repo = false
+format = "[ 󰉋 $path]($style) "
+
+[git_branch]
+symbol = " "
+style = "bold #f9e2af"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "bold #f38ba8"
+
+# Porcentaje de RAM
+[memory_usage]
+disabled = false
+threshold = -1
+symbol = "󰍛 "
+style = "bold #a6e3a1"
+format = "[$symbol${ram_pct}]($style) "
+
+# Espacio en disco
+[custom.diskspace]
+command = "df -h $HOME | awk 'NR==2{print $4}' | sed 's/$/B/'"
+symbol = "󰋊 "
+style = "bold #cba6f7"
+format = "[$symbol$output]($style) "
+shell = ["bash", "--noprofile", "--norc"]
+when = true
+
+[character]
+success_symbol = "[❯](bold #a6e3a1)"
+error_symbol = "[❯](bold #f38ba8)"

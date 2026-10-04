@@ -1,0 +1,103 @@
+#!/bin/sh
+# ii - Termux dashboard (POSIX sh, solo coreutils/procps)
+
+GREEN=$(printf '\033[32m')
+YELLOW=$(printf '\033[33m')
+RED=$(printf '\033[31m')
+CYAN=$(printf '\033[36m')
+DIM=$(printf '\033[2m')
+RESET=$(printf '\033[0m')
+
+BAR="╭$(printf '─%.0s' $(seq 1 40))╮"
+SEP="├$(printf '─%.0s' $(seq 1 40))┤"
+BOT="╰$(printf '─%.0s' $(seq 1 40))╯"
+
+trunc() { printf '%s' "$1" | cut -c1-"$2"; }
+
+# Filtra bytes de control (ESC, BEL, CR) que podrian inyectar secuencias
+# ANSI o hipervinculos de terminal via nombres de directorio/proceso.
+sanitize() { printf '%s' "$1" | tr -d '\033\007\r\n\t'; }
+
+row() {
+    printf '│ %-10s' "$1"
+    printf '%s' "$3"
+    printf '%-28s' "$2"
+    printf '%s │\n' "$RESET"
+}
+
+sub() {
+    printf '│ %s%-38s%s │\n' "$DIM" "$1" "$RESET"
+}
+
+git_row() {
+    printf '│  %-14s %-6s' "$1" "$2"
+    printf '%s' "$3"
+    printf '%-16s' "$4"
+    printf '%s │\n' "$RESET"
+}
+
+# --- RAM: porcentaje usado ---
+if grep -q MemAvailable /proc/meminfo 2>/dev/null; then
+    ram_pct=$(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{printf "%d", (t-a)*100/t}' /proc/meminfo)
+else
+    ram_pct=$(free -m | awk 'NR==2{printf "%d", $3*100/$2}')
+fi
+if [ "$ram_pct" -lt 80 ]; then ram_c=$GREEN
+elif [ "$ram_pct" -lt 90 ]; then ram_c=$YELLOW
+else ram_c=$RED; fi
+
+# --- Storage: libre en GB (color segun porcentaje usado) ---
+set -- $(df -h /data 2>/dev/null | awk 'NR==2{v=$4; t=$2; gsub(/[A-Za-z]/,"",t); if (v ~ /G$/) {n=v+0; if (n>=10) printf "%d", n; else printf "%.1f", n} else if (v ~ /M$/) {n=v+0; printf "%.1f", n/1024} else printf "%s", v; printf " %d", 100 - (v+0)*100/t}')
+st_free=$1
+st_pct=$2
+if [ -z "$st_pct" ]; then st_free="?"; st_pct=0; fi
+if [ "$st_pct" -lt 80 ]; then st_c=$GREEN
+elif [ "$st_pct" -lt 90 ]; then st_c=$YELLOW
+else st_c=$RED; fi
+
+# --- CPU: suma de %cpu de todos los procesos ---
+# /proc/stat no es legible sin root en Android y el resumen de top queda
+# fijo en idle=total (no mide). ps si reporta %cpu por proceso.
+cpu_pct=$(ps -eo %cpu 2>/dev/null | awk 'NR==1{next} {s+=$1} END{if (NR<=1) printf "?"; else {if (s>100) s=100; printf "%d", s}}')
+if [ "$cpu_pct" = "?" ]; then cpu_c=$DIM
+elif [ "$cpu_pct" -lt 80 ]; then cpu_c=$GREEN
+elif [ "$cpu_pct" -lt 90 ]; then cpu_c=$YELLOW
+else cpu_c=$RED; fi
+
+# --- SSH: sshd activo ---
+if pgrep -x sshd >/dev/null 2>&1; then ssh_t="activo"; ssh_c=$GREEN
+else ssh_t="inactivo"; ssh_c=$RED; fi
+
+# --- Git: todos los repos de ~/proyectos ---
+
+# --- Render ---
+printf '%s\n' "$BAR"
+printf '│ %11s%s%11s │\n' "" "TERMUX DASHBOARD" ""
+printf '%s\n' "$SEP"
+row "RAM" "${ram_pct}%" "$ram_c"
+row "Storage" "${st_free} GB" "$st_c"
+row "CPU" "${cpu_pct}%" "$cpu_c"
+row "SSH" "$ssh_t" "$ssh_c"
+printf '%s\n' "$SEP"
+sub "Proyectos"
+for d in "$HOME/proyectos"/*/; do
+    [ -d "$d" ] || continue
+    git -C "$d" rev-parse --git-dir >/dev/null 2>&1 || continue
+    name=$(sanitize "$(basename "$d")")
+    branch=$(sanitize "$(git -C "$d" rev-parse --abbrev-ref HEAD 2>/dev/null)")
+    [ -z "$branch" ] && branch="?"
+    changes=$(git -C "$d" status --porcelain 2>/dev/null | wc -l)
+    unpushed=$(git -C "$d" rev-list '@{u}..HEAD' --count 2>/dev/null)
+    [ -z "$unpushed" ] && unpushed=0
+    if [ "$changes" -eq 0 ] && [ "$unpushed" -eq 0 ]; then
+        st="limpio"; c=$GREEN
+    elif [ "$changes" -gt 0 ] && [ "$unpushed" -gt 0 ]; then
+        st="${changes} cambios, ${unpushed} push"; c=$YELLOW
+    elif [ "$changes" -gt 0 ]; then
+        st="${changes} cambios"; c=$YELLOW
+    else
+        st="${unpushed} sin push"; c=$CYAN
+    fi
+    git_row "$(trunc "$name" 14)" "$(trunc "$branch" 6)" "$c" "$(trunc "$st" 16)"
+done
+printf '%s\n' "$BOT"

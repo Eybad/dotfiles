@@ -1,0 +1,13 @@
+# Overrides locales y secretos — nunca versionar.
+*.local
+.gitconfig.local
+.zshrc.local
+.env
+*.key
+*.pem
+*.p12
+*history*
+.lesshst
+*.bak
+*~
+.DS_Store

@@ -1,0 +1,7 @@
+#!/data/data/com.termux/files/usr/bin/sh
+# Launcher de la CLI arbitraje (paquete en ~/proyectos/arbitraje).
+# -P evita que el cwd tape el paquete cuando se ejecuta desde ~/proyectos.
+set -eu
+PYTHONPATH="$HOME/proyectos/arbitraje${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH
+exec python3 -P -m arbitraje "$@"
